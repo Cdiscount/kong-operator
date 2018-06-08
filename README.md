@@ -1,5 +1,10 @@
 # Kong Operator
 
+[![Build Status](https://travis-ci.org/Cdiscount/kong-operator.svg?branch=master)](https://travis-ci.org/Cdiscount/kong-operator)
+[![codecov](https://codecov.io/gh/Cdiscount/kong-operator/branch/master/graph/badge.svg)](https://codecov.io/gh/Cdiscount/kong-operator)
+[![Go Report Master](https://goreportcard.com/badge/github.com/cdiscount/kong-operator)](https://goreportcard.com/report/github.com/etiennecoutaud/cdiscount)
+
+
 **Project status: *beta*** Not all planned features are completed. This operator aim to manage Kong *routes* and *services* to expose Kubernetes services.
 
 Once installed the Kong Operator provides the following features:
@@ -14,7 +19,7 @@ Kong operator supported:
 ## Installation
 
 ```shell
-kubectl apply -f 
+kubectl apply -f manifests/
 ```
 
 This command will create:
