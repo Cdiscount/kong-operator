@@ -1,9 +1,8 @@
 # Kong Operator
 
-[![Build Status](https://travis-ci.org/cdiscount/kong-operator.svg?branch=master)](https://travis-ci.org/cdiscount/kong-operator)
-[![codecov](https://codecov.io/gh/cdiscount/kong-operator/branch/master/graph/badge.svg)](https://codecov.io/gh/cdiscount/kong-operator)
-[![Go Report Master](https://goreportcard.com/badge/github.com/cdiscount/kong-operator)](https://goreportcard.com/report/github.com/etiennecoutaud/cdiscount)
-
+[![Build Status](https://travis-ci.org/Cdiscount/kong-operator.svg?branch=master)](https://travis-ci.org/Cdiscount/kong-operator)
+[![codecov](https://codecov.io/gh/Cdiscount/kong-operator/branch/master/graph/badge.svg)](https://codecov.io/gh/Cdiscount/kong-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Cdiscount/kong-operator)](https://goreportcard.com/report/github.com/Cdiscount/kong-operator)
 
 **Project status: *beta*** Not all planned features are completed. This operator aim to manage Kong *routes* and *services* to expose Kubernetes services.
 
