@@ -7,6 +7,9 @@ env:
     - COMMIT=${TRAVIS_COMMIT::8}
     - REPO=etiennecoutaud/kong-operator
 
+before_script:
+  - make dep
+
 script:
   - set -e
   - make test
