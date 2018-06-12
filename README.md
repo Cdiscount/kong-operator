@@ -1,7 +1,7 @@
 # Kong Operator
 
-[![Build Status](https://travis-ci.org/Cdiscount/kong-operator.svg?branch=master)](https://travis-ci.org/Cdiscount/kong-operator)
-[![codecov](https://codecov.io/gh/Cdiscount/kong-operator/branch/master/graph/badge.svg)](https://codecov.io/gh/Cdiscount/kong-operator)
+[![Build Status](https://travis-ci.org/cdiscount/kong-operator.svg?branch=master)](https://travis-ci.org/cdiscount/kong-operator)
+[![codecov](https://codecov.io/gh/cdiscount/kong-operator/branch/master/graph/badge.svg)](https://codecov.io/gh/cdiscount/kong-operator)
 [![Go Report Master](https://goreportcard.com/badge/github.com/cdiscount/kong-operator)](https://goreportcard.com/report/github.com/etiennecoutaud/cdiscount)
 
 

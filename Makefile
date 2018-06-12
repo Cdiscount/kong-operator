@@ -7,7 +7,7 @@ build:
 	go build github.com/cdiscount/kong-operator/cmd/kong-operator
 
 run: build
-	kubectl apply -f manifests/kanary-crd.yml
+	kubectl apply -f manifests/crd.yml
 	./kong-operator -kubeconfig=$(HOME)/.kube/config -v=2 -logtostderr=true
 
 darwin:

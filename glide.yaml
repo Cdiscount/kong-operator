@@ -1,4 +1,4 @@
-package: github.com/etiennecoutaud/kanary
+package: github.com/cdiscount/kong-operator
 import:
 - package: github.com/golang/glog
 - package: github.com/prometheus/client_golang
