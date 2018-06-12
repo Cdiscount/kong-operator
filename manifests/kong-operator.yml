@@ -18,7 +18,7 @@ rules:
   - get
   - watch
 - apiGroups:
-  - k8s.cdiscount.com
+  - apim.cdiscount.com
   resources:
   - kongroutes
   - kongservices
