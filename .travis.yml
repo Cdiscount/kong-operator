@@ -7,6 +7,9 @@ env:
     - COMMIT=${TRAVIS_COMMIT::8}
     - REPO=etiennecoutaud/kong-operator
 
+before_script:
+  - mv $HOME/gopath/src/github.com/Cdiscount/ $HOME/gopath/src/github.com/cdiscount/
+
 script:
   - set -e
   - make test
