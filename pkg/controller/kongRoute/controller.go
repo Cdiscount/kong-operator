@@ -5,6 +5,7 @@ import (
 	"time"
 	// 	"encoding/json"
 	// 	kanaryv1 "github.com/etiennecoutaud/kanary/pkg/apis/kanary/v1"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -16,6 +17,7 @@ import (
 	// 	"k8s.io/apimachinery/pkg/api/errors"
 	// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apimv1alpha1 "github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1"
 	clientset "github.com/cdiscount/kong-operator/pkg/client/clientset/versioned"
 	apimscheme "github.com/cdiscount/kong-operator/pkg/client/clientset/versioned/scheme"
 	informers "github.com/cdiscount/kong-operator/pkg/client/informers/externalversions"
@@ -90,12 +92,18 @@ func NewController(
 }
 
 func (c *Controller) addKongRoute(obj interface{}) {
+	kongRoute := obj.(*apimv1alpha1.KongRoute)
+	glog.Info("Add KongRoute: %s", kongRoute.Name)
 }
 
 func (c *Controller) updateKongRoute(old interface{}, cur interface{}) {
+	kongRoute := cur.(*apimv1alpha1.KongRoute)
+	glog.Info("Update KongRoute: %s", kongRoute.Name)
 }
 
 func (c *Controller) deleteKongRoute(obj interface{}) {
+	kongRoute := obj.(*apimv1alpha1.KongRoute)
+	glog.Info("Delete KongRoute: %s", kongRoute.Name)
 }
 
 // // enqueueKY takes a Kanary resource and converts it into a namespace/name
@@ -120,11 +128,10 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	defer c.workqueue.ShutDown()
 
 	// Start the informer factories to begin populating the informer caches
-	glog.Info("Starting Kanary controller")
+	glog.Info("Starting KongRoute controller")
 
 	// Wait for the caches to be synced before starting workers
 	glog.Info("Waiting for informer caches to sync")
-	//if ok := cache.WaitForCacheSync(stopCh, c.kanaryListerSynced, c.epListerSynced); !ok {
 	if ok := cache.WaitForCacheSync(stopCh, c.kongRouteListerSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}

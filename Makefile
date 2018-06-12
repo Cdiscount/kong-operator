@@ -8,7 +8,11 @@ build:
 
 run: build
 	kubectl apply -f manifests/crd.yml
-	./kong-operator -kubeconfig=$(HOME)/.kube/config -v=2 -logtostderr=true
+	./kong-operator -kubeconfig=$(HOME)/.kube/config -v=5 -logtostderr=true
+
+minikube: image
+	kubectl apply -f manifests/crd.yml
+	kubectl apply -f manifests/kong-operator-minikube.yml
 
 darwin:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s" -o kong-operator github.com/cdiscount/cmd/kong-operator
@@ -28,4 +32,4 @@ dep:
 gen:
 	hack/update-codegen.sh
 
-.PHONY: image build run test darwin linux dep gen 
+.PHONY: build run test darwin linux dep gen 

@@ -1,0 +1,78 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kong-operator
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kong-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - apim.cdiscount.com
+  resources:
+  - kongroutes
+  - kongservices
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kong-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kong-operator
+subjects:
+- kind: ServiceAccount
+  name: kong-operator
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: kong-operator
+spec:
+  selector:
+    matchLabels:
+      app: kong-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: kong-operator
+    spec:
+      serviceAccountName: kong-operator
+      containers:
+      - name: kong-operator
+        image: etiennecoutaud/kong-operator:dev
+        imagePullPolicy: Never
+        command:
+        - ./kong-operator
+        - -logtostderr
+        - -v=2
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 8080
+          name: http

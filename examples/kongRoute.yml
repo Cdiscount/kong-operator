@@ -1,0 +1,5 @@
+apiVersion: apim.cdiscount.com/v1alpha1
+kind: KongRoute
+metadata:
+  name: first-kong-route
+spec: 
