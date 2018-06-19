@@ -93,12 +93,12 @@ func NewController(
 
 func (c *Controller) addKongRoute(obj interface{}) {
 	kongRoute := obj.(*apimv1alpha1.KongRoute)
-	glog.Info("Add KongRoute: %s", kongRoute.Name)
+	glog.Info("Add KongRoute ", kongRoute.Name)
 }
 
 func (c *Controller) updateKongRoute(old interface{}, cur interface{}) {
 	kongRoute := cur.(*apimv1alpha1.KongRoute)
-	glog.Info("Update KongRoute: %s", kongRoute.Name)
+	glog.Info("Update KongRoute:", kongRoute.Name)
 }
 
 func (c *Controller) deleteKongRoute(obj interface{}) {

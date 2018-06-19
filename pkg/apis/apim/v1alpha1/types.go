@@ -28,10 +28,25 @@ type KongServiceList struct {
 }
 
 // KongServiceSpec represent kong service spec
-type KongServiceSpec struct{}
+type KongServiceSpec struct {
+	Protocol       string `json:"protocol"`
+	Path           string `json:"path"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	Retries        int    `json:"retries"`
+	ConnectTimeout int    `json:"connectTimeout"`
+	WriteTimeout   int    `json:"writeTimeout"`
+	ReadTimeout    int    `json:"readTimeout"`
+}
 
 // KongServiceStatus represent kong service status
-type KongServiceStatus struct{}
+type KongServiceStatus struct {
+	KongStatus   string `json:"kongStatus"`
+	KongID       string `json:"kongId"`
+	URL          string `json:"url"`
+	CreationDate string `json:"createdAt"`
+	UpdateDate   string `json:"updatedAt"`
+}
 
 // +genclient
 // +genclient:noStatus

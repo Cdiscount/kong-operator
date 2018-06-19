@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"goji.io"
@@ -17,8 +18,9 @@ import (
 
 	clientset "github.com/cdiscount/kong-operator/pkg/client/clientset/versioned"
 	apimInformers "github.com/cdiscount/kong-operator/pkg/client/informers/externalversions"
-	kongRoutecontroller "github.com/cdiscount/kong-operator/pkg/controller/kongRoute"
+	kongServiceController "github.com/cdiscount/kong-operator/pkg/controller/kongService"
 	route "github.com/cdiscount/kong-operator/pkg/route"
+	kongClient "github.com/etiennecoutaud/kong-client-go/kong"
 	kubeInformers "k8s.io/client-go/informers"
 )
 
@@ -58,9 +60,21 @@ func main() {
 	kubeInformerFactory := kubeInformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	apimInformerFactory := apimInformers.NewSharedInformerFactory(apimClient, time.Second*30)
 
-	kongRouteOperator := kongRoutecontroller.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory)
+	kongURL := os.Getenv("KONG_URL")
+	if kongURL == "" {
+		glog.Fatal("KONG_URL env var should be set")
+		os.Exit(1)
+	}
+	glog.Infof("KONG_URL: %s", kongURL)
+	kc, err := kongClient.NewClient(nil, kongURL)
+	if err != nil {
+		glog.Fatalf("Fail to create kong client : %v", err)
+	}
 
-	go kubeInformerFactory.Start(stopCh)
+	//kongRouteOperator := kongRouteController.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory)
+	kongServiceOperator := kongServiceController.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory, kc)
+
+	//go kubeInformerFactory.Start(stopCh)
 	go apimInformerFactory.Start(stopCh)
 
 	mux := goji.NewMux()
@@ -70,7 +84,10 @@ func main() {
 
 	go http.ListenAndServe(":8080", mux)
 
-	if err = kongRouteOperator.Run(2, stopCh); err != nil {
+	// if err = kongRouteOperator.Run(2, stopCh); err != nil {
+	// 	glog.Fatalf("Error running controller: %s", err.Error())
+	// }
+	if err = kongServiceOperator.Run(2, stopCh); err != nil {
 		glog.Fatalf("Error running controller: %s", err.Error())
 	}
 	glog.Flush()

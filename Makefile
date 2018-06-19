@@ -8,7 +8,7 @@ build:
 
 run: build
 	kubectl apply -f manifests/crd.yml
-	./kong-operator -kubeconfig=$(HOME)/.kube/config -v=5 -logtostderr=true
+	./kong-operator -kubeconfig=$(HOME)/.kube/config -v=5 -logtostderr=true  2>&1
 
 minikube: image
 	kubectl apply -f manifests/crd.yml

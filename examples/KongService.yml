@@ -1,0 +1,13 @@
+apiVersion: apim.cdiscount.com/v1alpha1
+kind: KongService
+metadata:
+  name: demo-kong-svc-2
+spec: 
+  path: /toto
+  protocol: "http"
+  retries: 10
+  port: 8080
+  host: "product"
+  connectTimeout: 60000
+  writeTimeout: 60000
+  readTimeout: 60000
