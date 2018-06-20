@@ -35,6 +35,8 @@ import:
   version: ^6.0.0
   subpackages:
   - listers/apps/v1
+- package: golang.org/x/sync
+  subpackages:
+  - errgroup
 - package: github.com/etiennecoutaud/kong-client-go
   version: ^0.1.0
-- package: golang.org/x/sync/errgroup

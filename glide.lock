@@ -1,5 +1,5 @@
-hash: a83b2512629f104bae767ad1e45d0c95a8d0b9b70f7d760dc8924bfeb1082e71
-updated: 2018-06-12T11:40:39.169833+02:00
+hash: 9695a56df46929c4c9e837e8a7cb5276f830075b466ae77b09a70903025d96e6
+updated: 2018-06-20T16:49:04.593214+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 3a771d992973f24aa725d07868b467d1ddfceafb
@@ -13,6 +13,10 @@ imports:
   version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
   - log
+- name: github.com/etiennecoutaud/kong-client-go
+  version: d1fae7cf1bd068be7ac60ea44fbdaadb8a4acb9b
+  subpackages:
+  - kong
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-openapi/jsonpointer
@@ -121,11 +125,14 @@ imports:
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
-  - context/ctxhttp
   - http2
   - http2/hpack
   - idna
   - lex/httplex
+- name: golang.org/x/sync
+  version: 1d60e4601c6fd243af51cc01ddf169918a5407ca
+  subpackages:
+  - errgroup
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -170,6 +177,7 @@ imports:
   - core/v1
   - events/v1beta1
   - extensions/v1beta1
+  - imagepolicy/v1alpha1
   - networking/v1
   - policy/v1beta1
   - rbac/v1

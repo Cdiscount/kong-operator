@@ -1,0 +1,3 @@
+package: github.com/etiennecoutaud/kong-client-go
+import:
+- package: github.com/google/go-querystring/query
