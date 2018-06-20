@@ -3,3 +3,15 @@ kind: KongRoute
 metadata:
   name: first-kong-route
 spec: 
+  service: kong-service
+  protocols:
+  - http
+  methods:
+  - GET
+  - POST
+  hosts:
+  - example.com
+  paths:
+  - /
+  stripPath: true
+  preserveHost: true

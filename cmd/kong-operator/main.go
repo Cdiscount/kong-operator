@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"goji.io"
 	"goji.io/pat"
@@ -18,6 +21,7 @@ import (
 
 	clientset "github.com/cdiscount/kong-operator/pkg/client/clientset/versioned"
 	apimInformers "github.com/cdiscount/kong-operator/pkg/client/informers/externalversions"
+	kongRouteController "github.com/cdiscount/kong-operator/pkg/controller/kongRoute"
 	kongServiceController "github.com/cdiscount/kong-operator/pkg/controller/kongService"
 	route "github.com/cdiscount/kong-operator/pkg/route"
 	kongClient "github.com/etiennecoutaud/kong-client-go/kong"
@@ -71,10 +75,10 @@ func main() {
 		glog.Fatalf("Fail to create kong client : %v", err)
 	}
 
-	//kongRouteOperator := kongRouteController.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory)
+	kongRouteOperator := kongRouteController.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory, kc)
 	kongServiceOperator := kongServiceController.NewController(kubeClient, apimClient, kubeInformerFactory, apimInformerFactory, kc)
 
-	//go kubeInformerFactory.Start(stopCh)
+	go kubeInformerFactory.Start(stopCh)
 	go apimInformerFactory.Start(stopCh)
 
 	mux := goji.NewMux()
@@ -84,11 +88,16 @@ func main() {
 
 	go http.ListenAndServe(":8080", mux)
 
-	// if err = kongRouteOperator.Run(2, stopCh); err != nil {
-	// 	glog.Fatalf("Error running controller: %s", err.Error())
-	// }
-	if err = kongServiceOperator.Run(2, stopCh); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	wg, _ := errgroup.WithContext(ctx)
+
+	wg.Go(func() error { return kongServiceOperator.Run(2, stopCh) })
+	wg.Go(func() error { return kongRouteOperator.Run(2, stopCh) })
+
+	cancel()
+	if err := wg.Wait(); err != nil {
 		glog.Fatalf("Error running controller: %s", err.Error())
 	}
+
 	glog.Flush()
 }

@@ -29,7 +29,6 @@ type KongServiceList struct {
 
 // KongServiceSpec represent kong service spec
 type KongServiceSpec struct {
-	Name           string `json:"name"`
 	Protocol       string `json:"protocol"`
 	Path           string `json:"path"`
 	Host           string `json:"host"`
@@ -58,8 +57,8 @@ type KongRoute struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   KongServiceSpec   `json:"spec"`
-	Status KongServiceStatus `json:"status"`
+	Spec   KongRouteSpec   `json:"spec"`
+	Status KongRouteStatus `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -73,7 +72,21 @@ type KongRouteList struct {
 }
 
 // KongRouteSpec represent kong route spec
-type KongRouteSpec struct{}
+type KongRouteSpec struct {
+	ServiceName  string   `json:"service"`
+	Protocols    []string `json:"protocols"`
+	Methods      []string `json:"methods"`
+	Hosts        []string `json:"hosts"`
+	Paths        []string `json:"paths"`
+	StripPath    bool     `json:"stripPath"`
+	PreserveHost bool     `json:"preserveHost"`
+}
 
 // KongRouteStatus represent kong route status
-type KongRouteStatus struct{}
+type KongRouteStatus struct {
+	KongStatus   string `json:"kongStatus"`
+	KongID       string `json:"kongId"`
+	ServiceRefID string `json:"serviceRefId"`
+	CreationDate string `json:"createdAt"`
+	UpdateDate   string `json:"updatedAt"`
+}
