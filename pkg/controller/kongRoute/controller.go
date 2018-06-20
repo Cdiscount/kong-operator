@@ -1,9 +1,12 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"reflect"
 	"time"
-	// 	"encoding/json"
 	// 	kanaryv1 "github.com/etiennecoutaud/kanary/pkg/apis/kanary/v1"
 
 	"github.com/golang/glog"
@@ -14,7 +17,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	// 	appsv1 "k8s.io/api/apps/v1"
-	// 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimv1alpha1 "github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1"
@@ -22,6 +25,8 @@ import (
 	apimscheme "github.com/cdiscount/kong-operator/pkg/client/clientset/versioned/scheme"
 	informers "github.com/cdiscount/kong-operator/pkg/client/informers/externalversions"
 	listers "github.com/cdiscount/kong-operator/pkg/client/listers/apim/v1alpha1"
+	utils "github.com/cdiscount/kong-operator/pkg/utils"
+	kongClient "github.com/etiennecoutaud/kong-client-go/kong"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -44,14 +49,17 @@ type Controller struct {
 	// sampleclientset is a clientset for our own API group
 	apimClientset clientset.Interface
 
-	kongRouteLister listers.KongRouteLister
+	kongRouteLister   listers.KongRouteLister
+	kongServiceLister listers.KongServiceLister
 
-	kongRouteListerSynced cache.InformerSynced
+	kongRouteListerSynced   cache.InformerSynced
+	kongServiceListerSynced cache.InformerSynced
 	// apim that needto be synced
 	workqueue workqueue.RateLimitingInterface
 	// recorder is an event recorder for recording Event resources to the
 	// Kubernetes API.
-	recorder record.EventRecorder
+	recorder   record.EventRecorder
+	kongClient *kongClient.Client
 }
 
 // NewController returns a new kanary controller
@@ -59,9 +67,11 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	apimClientset clientset.Interface,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
-	apimInformerFactory informers.SharedInformerFactory) *Controller {
+	apimInformerFactory informers.SharedInformerFactory,
+	kongClient *kongClient.Client) *Controller {
 
 	kongRouteInformer := apimInformerFactory.Apim().V1alpha1().KongRoutes()
+	kongServiceInformer := apimInformerFactory.Apim().V1alpha1().KongServices()
 	// Create event broadcaster
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
@@ -73,51 +83,65 @@ func NewController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 
 	controller := &Controller{
-		kubeclientset:         kubeclientset,
-		apimClientset:         apimClientset,
-		kongRouteLister:       kongRouteInformer.Lister(),
-		kongRouteListerSynced: kongRouteInformer.Informer().HasSynced,
-		workqueue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kongRoute"),
-		recorder:              recorder,
+		kubeclientset:           kubeclientset,
+		apimClientset:           apimClientset,
+		kongRouteLister:         kongRouteInformer.Lister(),
+		kongRouteListerSynced:   kongRouteInformer.Informer().HasSynced,
+		kongServiceLister:       kongServiceInformer.Lister(),
+		kongServiceListerSynced: kongServiceInformer.Informer().HasSynced,
+		workqueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kongRoute"),
+		recorder:                recorder,
+		kongClient:              kongClient,
 	}
 
 	kongRouteInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controller.addKongRoute,
-		UpdateFunc: controller.updateKongRoute,
-		DeleteFunc: controller.deleteKongRoute,
+		AddFunc:    controller.addKongRouteHandler,
+		UpdateFunc: controller.updateKongRouteHandler,
+		DeleteFunc: controller.deleteKongRouteHandler,
 	})
 
 	glog.Info("Setting up event handlers")
 	return controller
 }
 
-func (c *Controller) addKongRoute(obj interface{}) {
+func (c *Controller) addKongRouteHandler(obj interface{}) {
 	kongRoute := obj.(*apimv1alpha1.KongRoute)
 	glog.Info("Add KongRoute ", kongRoute.Name)
+	c.enqueue(kongRoute)
 }
 
-func (c *Controller) updateKongRoute(old interface{}, cur interface{}) {
+func (c *Controller) updateKongRouteHandler(old interface{}, cur interface{}) {
+	oldKongRoute := old.(*apimv1alpha1.KongRoute)
 	kongRoute := cur.(*apimv1alpha1.KongRoute)
-	glog.Info("Update KongRoute:", kongRoute.Name)
+	if !(reflect.DeepEqual(oldKongRoute.Spec, kongRoute.Spec)) {
+		glog.Info("Update KongRoute:", kongRoute.Name)
+		c.enqueue(kongRoute)
+	}
 }
 
-func (c *Controller) deleteKongRoute(obj interface{}) {
+func (c *Controller) deleteKongRouteHandler(obj interface{}) {
 	kongRoute := obj.(*apimv1alpha1.KongRoute)
-	glog.Info("Delete KongRoute: %s", kongRoute.Name)
+	if !reflect.DeepEqual(kongRoute.Status, apimv1alpha1.KongRouteStatus{}) {
+		err := c.deleteRoute(kongRoute)
+		if err != nil {
+			glog.Fatalf("Error when delete KongService: %s => %s", kongRoute.Name, err)
+		}
+		glog.Infof("KongService: %s deleted", kongRoute.Name)
+	}
 }
 
-// // enqueueKY takes a Kanary resource and converts it into a namespace/name
-// // string which is then put onto the work queue. This method should *not* be
-// // passed resources of any type other than Db.
-// func (c *Controller) enqueueKanary(obj interface{}) {
-// 	var key string
-// 	var err error
-// 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-// 		utilruntime.HandleError(err)
-// 		return
-// 	}
-// 	c.workqueue.AddRateLimited(key)
-// }
+// enqueue takes a KongRoute resource and converts it into a namespace/name
+// string which is then put onto the work queue. This method should *not* be
+// passed resources of any type other than Db.
+func (c *Controller) enqueue(obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	c.workqueue.AddRateLimited(key)
+}
 
 // Run will set up the event handlers for types we are interested in, as well
 // as syncing informer caches and starting workers. It will block until stopCh
@@ -132,7 +156,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	glog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.kongRouteListerSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.kongRouteListerSynced, c.kongServiceListerSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -187,354 +211,136 @@ func (c *Controller) handleErr(err error, key interface{}) {
 
 // Sync loop for kongRoute resources
 func (c *Controller) reconcile(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
+		return nil
+	}
+
+	// Get the KongRoute resource with this namespace/name
+	kgr, err := c.kongRouteLister.KongRoutes(namespace).Get(name)
+	if err != nil {
+		// processing.
+		if errors.IsNotFound(err) {
+			glog.V(2).Info(fmt.Sprintf("KongRoute %s no longer exists", key))
+			return nil
+		}
+		return err
+	}
+
+	// Create new KongRoute
+	// If no status then new object
+	// Else need to update
+	if reflect.DeepEqual(kgr.Status, apimv1alpha1.KongRouteStatus{}) {
+		kgr, err = c.createRoute(kgr)
+		if err != nil {
+			c.recorder.Event(kgr, corev1.EventTypeNormal, "Error", err.Error())
+			return err
+		}
+		c.recorder.Event(kgr, corev1.EventTypeNormal, "Info", "Kong Route created")
+	} else {
+		kgr, err = c.updateRoute(kgr)
+		if err != nil {
+			c.recorder.Event(kgr, corev1.EventTypeNormal, "Error", err.Error())
+			return err
+		}
+		c.recorder.Event(kgr, corev1.EventTypeNormal, "Info", "Kong Route updated")
+	}
+
+	c.recorder.Event(kgr, corev1.EventTypeNormal, "Sync", "Correctly sync")
 	return nil
 }
 
-// func (c *Controller) addKanary(obj interface{}) {
-// 	ky := obj.(*kanaryv1.Kanary)
-// 	glog.V(4).Infof("Adding Kanary %s", ky.Name)
-// 	c.enqueueKanary(ky)
-// }
+func (c *Controller) deleteRoute(kgr *apimv1alpha1.KongRoute) error {
+	_, err := c.kongClient.Route.Delete(kgr.Status.KongID)
+	return err
+}
 
-// func (c *Controller) updateKanary(old interface{}, cur interface{}) {
-// 	//oldKy := old.(*kanaryv1.Kanary)
-// 	curKy := cur.(*kanaryv1.Kanary)
+func (c *Controller) updateRoute(kgr *apimv1alpha1.KongRoute) (*apimv1alpha1.KongRoute, error) {
 
-// 	// if diff log diff
-// 	c.enqueueKanary(curKy)
-// }
+	serviceRef, err := c.kongServiceLister.KongServices(kgr.Namespace).Get(kgr.Spec.ServiceName)
+	if err != nil {
+		return kgr, err
+	}
 
-// func (c *Controller) deleteKanary(obj interface{}) {
-// 	ky := obj.(*kanaryv1.Kanary)
-// 	glog.V(4).Infof("Deleting Kanary %s", ky.Name)
-// 	err := c.deleteKyRefInEp(ky)
-// 	if err != nil {
-// 		glog.Error(err)
-// 	}
-// }
+	kongRouteAPI := &kongClient.Route{
+		Protocols:    kgr.Spec.Protocols,
+		Methods:      kgr.Spec.Methods,
+		Hosts:        kgr.Spec.Hosts,
+		Paths:        kgr.Spec.Paths,
+		StripPath:    kgr.Spec.StripPath,
+		PreserveHost: kgr.Spec.PreserveHost,
+		Service: &kongClient.ServiceRef{
+			ID: serviceRef.Status.KongID,
+		},
+	}
 
-// func (c *Controller) addEndpoint(obj interface{}) {
-// 	// Check if endpoint is in pool update pool if need
-// }
+	ret, err := c.kongClient.Route.Patch(kgr.Status.KongID, kongRouteAPI)
+	if err != nil {
+		glog.V(4).Infof("Return from kong: Error Code=%d, %v", ret.StatusCode, ret.Body)
+		return kgr, err
+	}
+	kgcr, err := unmarshalRoute(ret.Body)
+	if err != nil {
+		return kgr, err
+	}
+	return c.updateStatus(kgr, kgcr)
+}
 
-// func (c *Controller) updateEndpoint(obj interface{}, cur interface{}) {
-// 	// Check if url has change, change haproxy config
-// 	ep := obj.(*corev1.Endpoints)
-// 	var kyRef []string
-// 	if value, ok := ep.ObjectMeta.Annotations["kanaryRef"]; ok {
-// 		if err := json.Unmarshal([]byte(value), &kyRef); err != nil {
-// 			glog.Error(err)
-// 		}
-// 		if len(kyRef) == 0 {
-// 			return
-// 		}
-// 		for _, kyName := range kyRef {
-// 			ky, err := c.kanaryLister.Kanaries(ep.Namespace).Get(kyName)
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to get reference kanary: %s", kyName))
-// 				return
-// 			}
-// 			glog.V(4).Infof("Endpoint is refered by %s", kyName)
-// 			c.enqueueKanary(ky)
-// 		}
-// 	}
-// }
+func (c *Controller) createRoute(kgr *apimv1alpha1.KongRoute) (*apimv1alpha1.KongRoute, error) {
 
-// func (c *Controller) deleteEndpoint(obj interface{}) {
-// 	// Remove endpoint from ressource
-// }
+	serviceRef, err := c.kongServiceLister.KongServices(kgr.Namespace).Get(kgr.Spec.ServiceName)
+	if err != nil {
+		return kgr, err
+	}
 
-// // Sync loop for Kanary resources
-// func (c *Controller) syncKanary(key string) error {
+	kongRouteAPI := &kongClient.Route{
+		Protocols:    kgr.Spec.Protocols,
+		Methods:      kgr.Spec.Methods,
+		Hosts:        kgr.Spec.Hosts,
+		Paths:        kgr.Spec.Paths,
+		StripPath:    kgr.Spec.StripPath,
+		PreserveHost: kgr.Spec.PreserveHost,
+		Service: &kongClient.ServiceRef{
+			ID: serviceRef.Status.KongID,
+		},
+	}
 
-// 	// Convert the namespace/name string into a distinct namespace and name
-// 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-// 	if err != nil {
-// 		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
-// 		return nil
-// 	}
+	ret, err := c.kongClient.Route.Post(kongRouteAPI)
+	if err != nil {
+		glog.V(4).Infof("Return from kong: Error Code=%d, %v", ret.StatusCode, ret.Body)
+		return kgr, err
+	}
+	kgcr, err := unmarshalRoute(ret.Body)
+	if err != nil {
+		return kgr, err
+	}
+	return c.updateStatus(kgr, kgcr)
+}
 
-// 	// Get the Kanary resource with this namespace/name
-// 	ky, err := c.kanaryLister.Kanaries(namespace).Get(name)
-// 	if err != nil {
-// 		// The Kanary resource may no longer exist, in which case we stop
-// 		// processing.
-// 		if errors.IsNotFound(err) {
-// 			// Delete All stack Service + Pod + Service
-// 			// Add annotation with generator name
-// 			glog.V(2).Info(fmt.Sprintf("Kanary %s no longer exists", key))
-// 			return nil
-// 		}
-// 		return err
-// 	}
+func (c *Controller) updateStatus(kgr *apimv1alpha1.KongRoute, kgcr *kongClient.Route) (*apimv1alpha1.KongRoute, error) {
+	kgrCopy := kgr.DeepCopy()
+	kgrCopy.Status = apimv1alpha1.KongRouteStatus{
+		KongStatus:   "Registered",
+		KongID:       kgcr.ID,
+		ServiceRefID: kgcr.Service.ID,
+		CreationDate: utils.UnixTimeStr(kgcr.CreationDate),
+		UpdateDate:   utils.UnixTimeStr(kgcr.UpdateDate),
+	}
+	return c.apimClientset.ApimV1alpha1().KongRoutes(kgrCopy.Namespace).Update(kgrCopy)
+}
 
-// 	// Build expected endpoint status to compare with actual
-// 	expectedEndpointStatus, err := c.buildExpectedEndpointStatus(ky)
-// 	if err != nil {
-// 		glog.V(2).Info(fmt.Sprintf("Fail to build expected endpoint status : %s", err))
-// 		return nil
-// 	}
-// 	// Check for diff update if different
-// 	if !deepEqualEndpointStatusList(expectedEndpointStatus, ky.Status.EndpointStatus) {
-// 		haProxyController := newHAProxyController(expectedEndpointStatus)
-// 		haConfig, err := haProxyController.generateConfig()
-// 		if err != nil {
-// 			glog.V(2).Info(fmt.Sprintf("Fail to build HAproxy config : %s", err))
-// 			return nil
-// 		}
-// 		var cm *corev1.ConfigMap
-// 		if ky.Status.DestinationStatus.ConfigName == "" {
-// 			cm, err = c.kubeclientset.CoreV1().ConfigMaps(namespace).Create(newConfigMap(ky, haConfig))
-// 			if err != nil {
-// 				glog.V(2).Info(fmt.Sprintf("Fail to create HAProxy configMap : %s", err))
-// 				return nil
-// 			}
-// 			c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, successCreateCMMsg(cm.Name))
-// 		} else {
-// 			cm, err = c.kubeclientset.CoreV1().ConfigMaps(namespace).Update(newConfigMap(ky, haConfig))
-// 			if err != nil {
-// 				glog.V(2).Info(fmt.Sprintf("Fail to update HAProxy configMap : %s", err))
-// 				return nil
-// 			}
-// 			err = c.performRollingUpdate(ky.Status.DestinationStatus.ProxyName, ky.Namespace)
-// 			if err != nil {
-// 				glog.Errorf("Fail to perform rolling update, %s", err)
-// 				return nil
-// 			}
-// 			c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, successUpdateCMMsg(cm.Name))
-
-// 		}
-
-// 		ky, err = c.updateStatusConfigMap(ky, cm)
-// 		if err != nil {
-// 			utilruntime.HandleError(fmt.Errorf("Fail to update configmap ref status %s, %s", cm.Name, err))
-// 			return nil
-// 		}
-// 		ky, err = c.updateStatusEndpoint(ky, expectedEndpointStatus)
-// 		if err != nil {
-// 			utilruntime.HandleError(fmt.Errorf("Fail to update endpoint status '%v', %s", expectedEndpointStatus, err))
-// 			return nil
-// 		}
-
-// 		// Add Kanary owner ref to follow update
-// 		for _, epRef := range ky.Status.EndpointStatus {
-// 			ep, err := c.epLister.Endpoints(namespace).Get(epRef.ServiceName)
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to find endpoint %s", err))
-// 				return nil
-// 			}
-// 			newEp, err := addKanaryRefInEp(ep, ky.Name)
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to add kanaryRef %s", err))
-// 				return nil
-// 			}
-// 			_, err = c.kubeclientset.CoreV1().Endpoints(namespace).Update(newEp)
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to update endpoint %s", err))
-// 				return nil
-// 			}
-// 		}
-
-// 	}
-
-// 	// Manage Pod
-// 	if ky.HAProxyCreationNeeded() {
-// 		deployment, err := c.kubeclientset.AppsV1().Deployments(namespace).Create(newDeployementHA(ky))
-// 		if err != nil {
-// 			utilruntime.HandleError(fmt.Errorf("Fail to create deployment %s", err))
-// 			return nil
-// 		}
-// 		ky, err = c.updateStatusDeployment(ky, deployment)
-// 		if err != nil {
-// 			utilruntime.HandleError(fmt.Errorf("Fail to update status %s, %s", deployment.Name, err))
-// 			return nil
-// 		}
-// 		c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, successCreateDeploymentMsg(deployment.Name))
-// 	}
-
-// 	// HAProxy service create or update ?
-// 	if ky.Spec.Destination != ky.Status.DestinationStatus.ServiceName {
-// 		// Create destination Service
-// 		var service *corev1.Service
-// 		if ky.Status.DestinationStatus.ServiceName == "" {
-// 			service, err = c.kubeclientset.CoreV1().Services(namespace).Create(newService(ky))
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to create service %s", err))
-// 				return nil
-// 			}
-// 			c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, successCreateSvcMsg(service.Name))
-// 		} else {
-// 			err = c.kubeclientset.CoreV1().Services(namespace).Delete(ky.Status.DestinationStatus.ServiceName, nil)
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to delete service %s", err))
-// 				return nil
-// 			}
-// 			service, err = c.kubeclientset.CoreV1().Services(namespace).Create(newService(ky))
-// 			if err != nil {
-// 				utilruntime.HandleError(fmt.Errorf("Fail to update service %s", err))
-// 				return nil
-// 			}
-// 			c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, successUpdateSvcMsg(service.Name))
-// 		}
-// 		ky, err = c.updateStatusService(ky, service)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-
-// 	c.recorder.Event(ky, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
-// 	return nil
-// }
-
-// //TODO: Add test here
-// func (c *Controller) buildExpectedEndpointStatus(ky *kanaryv1.Kanary) ([]kanaryv1.KanaryEndpointList, error) {
-// 	var kyEpList []kanaryv1.KanaryEndpointList
-
-// 	for _, route := range ky.Spec.Routes {
-// 		ep, err := c.epLister.Endpoints(ky.Namespace).Get(route.Backend.ServiceName)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		servicePortInt32 := verifyEndpointPortExist(ep, route.Backend.ServicePort)
-// 		if servicePortInt32 == -1 {
-// 			return nil, errors.NewNotFound(corev1.Resource("endpoints"), route.Backend.ServicePort.StrVal)
-// 		}
-// 		var kyEp kanaryv1.KanaryEndpointList
-// 		kyEp.ServiceName = route.Backend.ServiceName
-// 		kyEp.Weight = route.Weight
-// 		for _, subset := range ep.Subsets {
-// 			for _, addr := range subset.Addresses {
-// 				fullIP := addr.IP + ":" + strconv.Itoa(int(servicePortInt32))
-// 				kyEp.Ips = append(kyEp.Ips, fullIP)
-// 			}
-// 		}
-// 		kyEpList = append(kyEpList, kyEp)
-// 	}
-
-// 	return kyEpList, nil
-// }
-
-// func (c Controller) updateStatusEndpoint(ky *kanaryv1.Kanary, epList []kanaryv1.KanaryEndpointList) (*kanaryv1.Kanary, error) {
-// 	kycopy := ky.DeepCopy()
-// 	kycopy.Status.EndpointStatus = epList
-// 	newky, err := c.kanaryclientset.KanaryV1().Kanaries(ky.Namespace).Update(kycopy)
-// 	return newky, err
-// }
-
-// func (c Controller) updateStatusConfigMap(ky *kanaryv1.Kanary, cm *corev1.ConfigMap) (*kanaryv1.Kanary, error) {
-// 	kycopy := ky.DeepCopy()
-// 	kycopy.Status.DestinationStatus.ConfigName = cm.Name
-// 	newky, err := c.kanaryclientset.KanaryV1().Kanaries(ky.Namespace).Update(kycopy)
-// 	return newky, err
-// }
-
-// func (c Controller) updateStatusDeployment(ky *kanaryv1.Kanary, deployment *appsv1.Deployment) (*kanaryv1.Kanary, error) {
-// 	kycopy := ky.DeepCopy()
-// 	kycopy.Status.DestinationStatus.ProxyName = deployment.Name
-// 	newky, err := c.kanaryclientset.KanaryV1().Kanaries(ky.Namespace).Update(kycopy)
-// 	return newky, err
-// }
-
-// func (c Controller) updateStatusService(ky *kanaryv1.Kanary, svc *corev1.Service) (*kanaryv1.Kanary, error) {
-// 	kycopy := ky.DeepCopy()
-// 	kycopy.Status.DestinationStatus.ServiceName = svc.Name
-// 	newky, err := c.kanaryclientset.KanaryV1().Kanaries(ky.Namespace).Update(kycopy)
-// 	return newky, err
-// }
-
-// func newService(owner *kanaryv1.Kanary) *corev1.Service {
-// 	return &corev1.Service{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      owner.Spec.Destination,
-// 			Namespace: owner.Namespace,
-// 			OwnerReferences: []metav1.OwnerReference{
-// 				*metav1.NewControllerRef(owner, schema.GroupVersionKind{
-// 					Group:   kanaryv1.SchemeGroupVersion.Group,
-// 					Version: kanaryv1.SchemeGroupVersion.Version,
-// 					Kind:    "Kanary",
-// 				}),
-// 			},
-// 		},
-// 		Spec: corev1.ServiceSpec{
-// 			Ports: []corev1.ServicePort{
-// 				{
-// 					Port: 80,
-// 				},
-// 			},
-// 			Selector: map[string]string{"proxy": owner.Name + "-haproxy"},
-// 			Type:     corev1.ServiceTypeClusterIP,
-// 		},
-// 	}
-// }
-
-// func addKanaryRefInEp(ep *corev1.Endpoints, owner string) (*corev1.Endpoints, error) {
-// 	epCopy := ep.DeepCopy()
-
-// 	var kanaryRefRange []string
-// 	var kanaryRefString []byte
-
-// 	kanaryRef := []byte(epCopy.Annotations["kanaryRef"])
-// 	if len(kanaryRef) != 0 {
-// 		err := json.Unmarshal(kanaryRef, &kanaryRefRange)
-// 		if err != nil {
-// 			glog.Errorf("Fail to Unmarshall string %s", kanaryRef)
-// 			return nil, err
-// 		}
-// 	}
-// 	if !containsString(kanaryRefRange, owner) {
-// 		kanaryRefRange = append(kanaryRefRange, owner)
-// 	}
-// 	kanaryRefString, err := json.Marshal(kanaryRefRange)
-// 	if err != nil {
-// 		glog.Errorf("Fail to Marshal slice '%v'", kanaryRefRange)
-// 		return nil, err
-// 	}
-// 	if len(epCopy.Annotations) == 0 {
-// 		epCopy.Annotations = map[string]string{}
-// 	}
-// 	epCopy.Annotations["kanaryRef"] = string(kanaryRefString[:])
-// 	glog.Infof("Struct : '%v'", epCopy)
-// 	return epCopy, nil
-// }
-
-// func (c *Controller) deleteKyRefInEp(ky *kanaryv1.Kanary) error {
-// 	var kyRef []string
-// 	for _, epStatus := range ky.Status.EndpointStatus {
-// 		ep, err := c.epLister.Endpoints(ky.Namespace).Get(epStatus.ServiceName)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		epCopy := ep.DeepCopy()
-// 		if err = json.Unmarshal([]byte(epCopy.Annotations["kanaryRef"]), &kyRef); err != nil {
-// 			return err
-// 		}
-// 		indexElt := getEltToDeleteIndex(kyRef, ky.Name)
-// 		kyRef = append(kyRef[:indexElt], kyRef[indexElt+1:]...)
-// 		kyRefString, err := json.Marshal(kyRef)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		epCopy.Annotations["kanaryRef"] = string(kyRefString[:])
-// 		_, err = c.kubeclientset.CoreV1().Endpoints(ky.Namespace).Update(epCopy)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-// 	return nil
-// }
-
-// func (c *Controller) performRollingUpdate(deploymentName string, ns string) error {
-// 	deploy, err := c.kubeclientset.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-// 	if err != nil {
-// 		return err
-// 	}
-// 	deployCopy := deploy.DeepCopy()
-// 	revision, err := strconv.Atoi(deployCopy.Spec.Template.Annotations["kanary.revision"])
-// 	if err != nil {
-// 		glog.V(2).Info("Fail to convert kanary.revision, set to 0")
-// 		revision = 0
-// 	}
-// 	deployCopy.Spec.Template.Annotations["kanary.revision"] = strconv.Itoa(revision + 1)
-// 	_, err = c.kubeclientset.AppsV1().Deployments(ns).Update(deployCopy)
-// 	return err
-// }
+func unmarshalRoute(resp io.ReadCloser) (*kongClient.Route, error) {
+	body, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return nil, err
+	}
+	var kcgr = new(kongClient.Route)
+	err = json.Unmarshal([]byte(body), &kcgr)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("Unmarshal struct => %v", kcgr)
+	return kcgr, nil
+}

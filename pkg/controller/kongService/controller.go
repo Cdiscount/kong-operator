@@ -246,7 +246,7 @@ func (c *Controller) reconcile(key string) error {
 
 func (c *Controller) updateService(kgs *apimv1alpha1.KongService) (*apimv1alpha1.KongService, error) {
 	kongServiceAPI := &kongClient.Service{
-		Name:           kgs.Spec.Name,
+		Name:           kgs.Name,
 		Protocol:       kgs.Spec.Protocol,
 		Host:           kgs.Spec.Host,
 		Port:           kgs.Spec.Port,
@@ -270,7 +270,7 @@ func (c *Controller) updateService(kgs *apimv1alpha1.KongService) (*apimv1alpha1
 
 func (c *Controller) createService(kgs *apimv1alpha1.KongService) (*apimv1alpha1.KongService, error) {
 	kongServiceAPI := &kongClient.Service{
-		Name:           kgs.Spec.Name,
+		Name:           kgs.Name,
 		Protocol:       kgs.Spec.Protocol,
 		Host:           kgs.Spec.Host,
 		Port:           kgs.Spec.Port,
