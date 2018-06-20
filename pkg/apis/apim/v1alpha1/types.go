@@ -29,6 +29,7 @@ type KongServiceList struct {
 
 // KongServiceSpec represent kong service spec
 type KongServiceSpec struct {
+	Name           string `json:"name"`
 	Protocol       string `json:"protocol"`
 	Path           string `json:"path"`
 	Host           string `json:"host"`

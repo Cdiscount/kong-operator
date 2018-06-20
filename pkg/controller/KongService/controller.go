@@ -102,18 +102,24 @@ func (c *Controller) addKongServiceHandler(obj interface{}) {
 }
 
 func (c *Controller) updateKongServiceHandler(old interface{}, cur interface{}) {
+	oldKongService := old.(*apimv1alpha1.KongService)
 	kongService := cur.(*apimv1alpha1.KongService)
-	glog.Info("Update KongService:", kongService.Name)
-	c.enqueue(kongService)
+	if !(reflect.DeepEqual(oldKongService.Spec, kongService.Spec)) {
+		glog.Info("Update KongService:", kongService.Name)
+		c.enqueue(kongService)
+	}
 }
 
 func (c *Controller) deleteKongServiceHandler(obj interface{}) {
 	kongService := obj.(*apimv1alpha1.KongService)
-	err := c.deleteService(kongService)
-	if err != nil {
-		glog.Fatalf("Error when delete KongService: %s => %s", kongService.Name, err)
+	//Delete only if object has been created
+	if !reflect.DeepEqual(kongService.Status, apimv1alpha1.KongServiceStatus{}) {
+		err := c.deleteService(kongService)
+		if err != nil {
+			glog.Fatalf("Error when delete KongService: %s => %s", kongService.Name, err)
+		}
+		glog.Infof("KongService: %s deleted", kongService.Name)
 	}
-	glog.Infof("KongService: %s deleted", kongService.Name)
 }
 
 // enqueue takes a resource and converts it into a namespace/name
@@ -216,27 +222,55 @@ func (c *Controller) reconcile(key string) error {
 	}
 
 	// Create new KongService
+	// If no status then new object
+	// Else need to update
 	if reflect.DeepEqual(kgs.Status, apimv1alpha1.KongServiceStatus{}) {
 		kgs, err = c.createService(kgs)
 		if err != nil {
+			c.recorder.Event(kgs, corev1.EventTypeNormal, "Error", err.Error())
 			return err
 		}
 		c.recorder.Event(kgs, corev1.EventTypeNormal, "Info", "Kong Service created")
+	} else {
+		kgs, err = c.updateService(kgs)
+		if err != nil {
+			c.recorder.Event(kgs, corev1.EventTypeNormal, "Error", err.Error())
+			return err
+		}
+		c.recorder.Event(kgs, corev1.EventTypeNormal, "Info", "Kong Service updated")
 	}
-
-	// Update KongService
-	//
-	// Get Kong object
-	// Compare spec
-	// Update if need
 
 	c.recorder.Event(kgs, corev1.EventTypeNormal, "Sync", "Correctly sync")
 	return nil
 }
 
+func (c *Controller) updateService(kgs *apimv1alpha1.KongService) (*apimv1alpha1.KongService, error) {
+	kongServiceAPI := &kongClient.Service{
+		Name:           kgs.Spec.Name,
+		Protocol:       kgs.Spec.Protocol,
+		Host:           kgs.Spec.Host,
+		Port:           kgs.Spec.Port,
+		Path:           kgs.Spec.Path,
+		Retries:        kgs.Spec.Retries,
+		ConnectTimeout: kgs.Spec.ConnectTimeout,
+		WriteTimeout:   kgs.Spec.WriteTimeout,
+		ReadTimeout:    kgs.Spec.ReadTimeout,
+	}
+	ret, err := c.kongClient.Service.Patch(kgs.Status.KongID, kongServiceAPI)
+	if err != nil {
+		glog.V(4).Infof("Return from kong: Error Code=%d, %v", ret.StatusCode, ret.Body)
+		return kgs, err
+	}
+	kgcs, err := unmarshalService(ret.Body)
+	if err != nil {
+		return kgs, err
+	}
+	return c.updateStatus(kgs, kgcs)
+}
+
 func (c *Controller) createService(kgs *apimv1alpha1.KongService) (*apimv1alpha1.KongService, error) {
 	kongServiceAPI := &kongClient.Service{
-		Name:           kgs.Name,
+		Name:           kgs.Spec.Name,
 		Protocol:       kgs.Spec.Protocol,
 		Host:           kgs.Spec.Host,
 		Port:           kgs.Spec.Port,
@@ -250,11 +284,11 @@ func (c *Controller) createService(kgs *apimv1alpha1.KongService) (*apimv1alpha1
 	ret, err := c.kongClient.Service.Post(kongServiceAPI)
 	if err != nil {
 		glog.V(4).Infof("Return from kong: Error Code=%d, %v", ret.StatusCode, ret.Body)
-		return nil, err
+		return kgs, err
 	}
 	kgcs, err := unmarshalService(ret.Body)
 	if err != nil {
-		return nil, err
+		return kgs, err
 	}
 	return c.updateStatus(kgs, kgcs)
 }
