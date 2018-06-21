@@ -23,8 +23,7 @@ type KongService struct {
 type KongServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-
-	Items []KongService `json:"items"`
+	Items           []KongService `json:"items"`
 }
 
 // KongServiceSpec represent kong service spec

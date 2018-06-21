@@ -117,8 +117,8 @@ github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:294.16
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:311.16,314.3 2 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:316.16,318.3 1 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:322.121,332.2 3 0
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:334.68,336.16 2 0
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:339.2,341.16 3 0
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:344.2,345.18 2 0
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:334.68,336.16 2 1
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:339.2,341.16 3 1
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:344.2,345.18 2 1
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:336.16,338.3 1 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:341.16,343.3 1 0
