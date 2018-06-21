@@ -1,5 +1,5 @@
 mode: atomic
-github.com/cdiscount/kong-operator/pkg/route/route.go:10.55,11.2 0 0
+github.com/cdiscount/kong-operator/pkg/route/route.go:10.54,14.2 3 1
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:15.41,17.2 1 0
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:20.53,22.2 1 0
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:32.50,39.2 3 1
