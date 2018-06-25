@@ -17,8 +17,12 @@ Kong operator supported:
 
 ## Installation
 
+:warning: You need to specify `KONG_URL` value in [manifests/kong-operator.yaml](manifests/kong-operator.yaml) before installing
+
 ```shell
-kubectl apply -f manifests/
+git clone https://github.com/Cdiscount/kong-operator
+cd kong-operator
+kubectl apply -f manifests/kong-operator.yaml
 ```
 
 This command will create:
