@@ -18,7 +18,7 @@ Kong operator supported:
 ## Installation
 
 ```shell
-kubectl apply -f manifests/
+kubectl apply -f https://raw.githubusercontent.com/Cdiscount/kong-controller/release-v0.1.0/manifests/kong-operator.yml
 ```
 
 This command will create:
