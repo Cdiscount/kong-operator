@@ -129,6 +129,7 @@ and add this to your node policy:
             "acm:ListCertificates",
             "acm:DescribeCertificate",
             "autoscaling:DescribeAutoScalingGroups",
+            "autoscaling:DescribeLoadBalancerTargetGroups",
             "autoscaling:AttachLoadBalancers",
             "autoscaling:DetachLoadBalancers",
             "autoscaling:DetachLoadBalancerTargetGroups",
@@ -240,6 +241,11 @@ sed -i "s/<HOSTNAME>/demo-app.example.org/" v1.0.0.yaml
 sed -i "s/<HOSTNAME2>/demo-green-blue.example.org/" v1.0.0.yaml
 kubectl create -f v1.0.0.yaml
 ```
+
+If your VPC-CIDR is different from 10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12, 127.0.0.1/8,fd00::/8 or ::1/128 you may
+get a "Readiness probe failed: HTTP probe failed with statuscode: 404" from the skipper pods with the *latest* or
+*v0.10.7* tag of skipper.
+To prevent this, uncomment the "-whitelisted-healthcheck-cidr=<CIDR_BLOCK>" in v1.0.0.yaml and add your VPC-CIDR.
 
 Check, if the installation was successful:
 

@@ -1,8 +1,5 @@
 mode: atomic
 github.com/cdiscount/kong-operator/pkg/route/route.go:10.54,14.2 3 1
-github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:15.41,17.2 1 0
-github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:20.53,22.2 1 0
-github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:32.50,39.2 3 1
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:28.51,35.2 6 20
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:38.44,39.15 1 20
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:42.2,44.12 3 20
@@ -61,6 +58,9 @@ github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:224.60,225.15 1 0
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:228.2,230.12 3 0
 github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/zz_generated.deepcopy.go:225.15,227.3 1 0
+github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:15.41,17.2 1 0
+github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:20.53,22.2 1 0
+github.com/cdiscount/kong-operator/pkg/apis/apim/v1alpha1/register.go:32.50,39.2 3 1
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:71.45,105.2 12 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:107.59,111.2 3 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:113.79,116.61 3 0
@@ -117,8 +117,8 @@ github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:294.16
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:311.16,314.3 2 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:316.16,318.3 1 0
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:322.121,332.2 3 0
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:334.68,336.16 2 1
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:339.2,341.16 3 1
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:334.68,336.16 2 2
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:339.2,341.16 3 2
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:344.2,345.18 2 1
 github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:336.16,338.3 1 0
-github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:341.16,343.3 1 0
+github.com/cdiscount/kong-operator/pkg/controller/kongRoute/controller.go:341.16,343.3 1 1

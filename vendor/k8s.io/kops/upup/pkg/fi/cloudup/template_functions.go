@@ -28,6 +28,7 @@ When defining a new function:
 package cloudup
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -58,7 +59,9 @@ type TemplateFunctions struct {
 func (tf *TemplateFunctions) AddTo(dest template.FuncMap) {
 	dest["EtcdScheme"] = tf.EtcdScheme
 	dest["SharedVPC"] = tf.SharedVPC
-	dest["UseEtcdTLS"] = tf.UseEtcdTLS
+	dest["ToJSON"] = tf.ToJSON
+	dest["UseBootstrapTokens"] = tf.modelContext.UseBootstrapTokens
+	dest["UseEtcdTLS"] = tf.modelContext.UseEtcdTLS
 	// Remember that we may be on a different arch from the target.  Hard-code for now.
 	dest["Arch"] = func() string { return "amd64" }
 	dest["replace"] = func(s, find, replace string) string {
@@ -108,20 +111,19 @@ func (tf *TemplateFunctions) AddTo(dest template.FuncMap) {
 	}
 }
 
-// UseEtcdTLS checks if cluster is using etcd tls
-func (tf *TemplateFunctions) UseEtcdTLS() bool {
-	for _, x := range tf.cluster.Spec.EtcdClusters {
-		if x.EnableEtcdTLS {
-			return true
-		}
+// ToJSON returns a json representation of the struct or on error an empty string
+func (tf *TemplateFunctions) ToJSON(data interface{}) string {
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return ""
 	}
 
-	return false
+	return string(encoded)
 }
 
 // EtcdScheme parses and grabs the protocol to the etcd cluster
 func (tf *TemplateFunctions) EtcdScheme() string {
-	if tf.UseEtcdTLS() {
+	if tf.modelContext.UseEtcdTLS() {
 		return "https"
 	}
 

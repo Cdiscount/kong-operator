@@ -18,7 +18,7 @@ S3_BUCKET?=s3://must-override/
 GCS_LOCATION?=gs://must-override
 GCS_URL=$(GCS_LOCATION:gs://%=https://storage.googleapis.com/%)
 LATEST_FILE?=latest-ci.txt
-GOPATH_1ST=$(shell go env | grep GOPATH | cut -f 2 -d \")
+GOPATH_1ST:=$(shell go env | grep GOPATH | cut -f 2 -d \")
 UNIQUE:=$(shell date +%s)
 GOVERSION=1.9.3
 BUILD=$(GOPATH_1ST)/src/k8s.io/kops/.build
@@ -53,12 +53,12 @@ unexport KOPS_BASE_URL KOPS_CLUSTER_NAME KOPS_RUN_OBSOLETE_VERSION KOPS_STATE_ST
 unexport SKIP_REGION_CHECK S3_ACCESS_KEY_ID S3_ENDPOINT S3_REGION S3_SECRET_ACCESS_KEY VSPHERE_USERNAME VSPHERE_PASSWORD
 
 # Keep in sync with upup/models/cloudup/resources/addons/dns-controller/
-DNS_CONTROLLER_TAG=1.9.1
+DNS_CONTROLLER_TAG=1.10.0-alpha.1
 
 # Keep in sync with logic in get_workspace_status
-# Update variables in tools/get_workplace_status.sh for the bazel build
-KOPS_RELEASE_VERSION = 1.9.1
-KOPS_CI_VERSION      = 1.9.2-alpha.1
+# TODO: just invoke tools/get_workspace_status.sh?
+KOPS_RELEASE_VERSION:=$(shell grep 'KOPS_RELEASE_VERSION\s*=' version.go | awk '{print $$3}' | sed -e 's_"__g')
+KOPS_CI_VERSION:=$(shell grep 'KOPS_CI_VERSION\s*=' version.go | awk '{print $$3}' | sed -e 's_"__g')
 
 # kops local location
 KOPS                 = ${LOCAL}/kops
@@ -97,8 +97,12 @@ KOPS_SERVER_TAG := $(subst +,-,${VERSION})
 GO15VENDOREXPERIMENT=1
 export GO15VENDOREXPERIMENT
 
-COMPILERVERSION := $(shell go version | cut -d' ' -f3 | tr -d '\n')
-ifneq (,$(findstring go1.10,$(COMPILERVERSION)))
+COMPILERVERSION := $(shell go version | cut -d' ' -f3 | sed 's/go//g' | tr -d '\n')
+COMPILER_VER_MAJOR := $(shell echo $(COMPILERVERSION) | cut -f1 -d.)
+COMPILER_VER_MINOR := $(shell echo $(COMPILERVERSION) | cut -f2 -d.)
+COMPILER_GT_1_10 := $(shell [ $(COMPILER_VER_MAJOR) -gt 1 -o \( $(COMPILER_VER_MAJOR) -eq 1 -a $(COMPILER_VER_MINOR) -ge 10 \) ] && echo true)
+
+ifeq ($(COMPILER_GT_1_10), true)
 LDFLAGS := -ldflags=all=
 else
 LDFLAGS := -ldflags=
@@ -205,6 +209,7 @@ codegen: kops-gobindata
 	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/cloudup/gcetasks
 	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/cloudup/dotasks
 	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/cloudup/openstacktasks
+	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/cloudup/alitasks
 	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/assettasks
 	PATH=${GOPATH_1ST}/bin:${PATH} go generate k8s.io/kops/upup/pkg/fi/fitasks
 
@@ -498,6 +503,15 @@ verify-gofmt:
 verify-packages: ${BINDATA_TARGETS}
 	hack/verify-packages.sh
 
+.PHONY: verify-misspelling
+verify-misspelling:
+	@which misspell 2>/dev/null ; if [ $$? -eq 1 ]; then \
+		go get -u github.com/client9/misspell/cmd/misspell; \
+	fi
+	@find . -type f \( -name "*.go*" -o -name "*.md*" \) -a \( -not -path "./vendor/*" -not -path "./_vendor/*" \) | \
+		sed -e /README-ES.md/d -e /node_modules/d | \
+		xargs misspell -error
+
 .PHONY: verify-gendocs
 verify-gendocs: ${KOPS}
 	@TMP_DOCS="$$(mktemp -d)"; \
@@ -518,7 +532,7 @@ verify-bazel:
 # verify-package has to be after verify-gendoc, because with .gitignore for federation bindata
 # it bombs in travis. verify-gendoc generates the bindata file.
 .PHONY: ci
-ci: govet verify-gofmt verify-boilerplate verify-bazel nodeup examples test | verify-gendocs verify-packages
+ci: govet verify-gofmt verify-boilerplate verify-bazel verify-misspelling nodeup examples test | verify-gendocs verify-packages verify-apimachinery
 	echo "Done!"
 
 # --------------------------------------------------
@@ -579,6 +593,9 @@ apimachinery-codegen:
 	${GOPATH}/bin/client-gen  ${API_OPTIONS} --clientset-name="clientset" --input-base k8s.io/kops/pkg/apis/ --input="kops/,kops/v1alpha1,kops/v1alpha2" --clientset-path k8s.io/kops/pkg/client/clientset_generated/ \
 		 --go-header-file "hack/boilerplate/boilerplate.go.txt"
 
+.PHONY: verify-apimachinery
+verify-apimachinery:
+	hack/verify-apimachinery.sh
 
 # -----------------------------------------------------
 # kops-server
@@ -647,7 +664,8 @@ bazel-crossbuild-kube-discovery-image:
 .PHONY: bazel-push
 # Will always push a linux-based build up to the server
 bazel-push: bazel-crossbuild-nodeup
-	scp -C bazel-bin/cmd/nodeup/nodeup  ${TARGET}:/tmp/
+	ssh ${TARGET} chmod +w /tmp/nodeup
+	scp -C bazel-bin/cmd/nodeup/linux_amd64_pure_stripped/nodeup  ${TARGET}:/tmp/
 
 .PHONY: bazel-push-gce-run
 bazel-push-gce-run: bazel-push

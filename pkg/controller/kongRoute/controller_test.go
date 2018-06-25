@@ -1,4 +1,4 @@
-package controller
+package kongRoute
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ func TestUnmarshalRoute(t *testing.T) {
 		Name              string
 		Body              string
 		ExpectedUnmarshal *kongClient.Route
-		ExpectedError     error
+		ExpectedErrorNil  bool
 	}
 
 	tests := []*TestScenario{
@@ -37,7 +37,13 @@ func TestUnmarshalRoute(t *testing.T) {
 				CreationDate: 1529502316,
 				UpdateDate:   1529502375,
 			},
-			ExpectedError: nil,
+			ExpectedErrorNil: true,
+		},
+		&TestScenario{
+			Name:              "ok-fail-json-1",
+			Body:              "\"strip_path\"::\"hosts\":[\"example.com\"],\"preserve_host\":true,\"regex_priority\":0,\"updated_at\":1529502375,\"paths\":[\"/\"],\"service\":{\"id\":\"bd3d51da-5c6a-4d9c-b8b9-ca14b30a714e\"},\"methods\":[\"GET\",\"POST\"],\"protocols\":[\"http\"],\"id\":\"6c8dbf33-02f4-4c37-9786-9f41e22f08e7\"}",
+			ExpectedUnmarshal: &kongClient.Route{},
+			ExpectedErrorNil:  false,
 		},
 	}
 
@@ -47,8 +53,9 @@ func TestUnmarshalRoute(t *testing.T) {
 		}
 
 		res, err := unmarshalRoute(r.Body)
-		if !reflect.DeepEqual(res, test.ExpectedUnmarshal) || !reflect.DeepEqual(err, test.ExpectedError) {
-			t.Errorf("Test %s failed\nExpected struct %v, got %v\nExpected error %v, got %v", test.Name, test.ExpectedUnmarshal, res, test.ExpectedError, err)
+		errBool := (err == nil)
+		if errBool != test.ExpectedErrorNil && !reflect.DeepEqual(res, test.ExpectedUnmarshal) {
+			t.Errorf("Test %s failed\nExpected struct %v, got %v\nExpected error == nil %v, got %v", test.Name, test.ExpectedUnmarshal, res, test.ExpectedErrorNil, err)
 		}
 	}
 }

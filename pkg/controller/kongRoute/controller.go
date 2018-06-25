@@ -1,4 +1,4 @@
-package controller
+package kongRoute
 
 import (
 	"encoding/json"
